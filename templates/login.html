@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Вход - Финансовый трекер{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>Вход</h1>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+
+        <div class="form-group">
+            {{ form.username.label }}
+            {{ form.username() }}
+            {% if form.username.errors %}
+            {% for error in form.username.errors %}
+            <div class="error">{{ error }}</div>
+            {% endfor %}
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            {{ form.password.label }}
+            {{ form.password() }}
+            {% if form.password.errors %}
+            {% for error in form.password.errors %}
+            <div class="error">{{ error }}</div>
+            {% endfor %}
+            {% endif %}
+        </div>
+
+        {{ form.submit(class="btn btn-block") }}
+    </form>
+
+    <p style="text-align: center; margin-top: 20px;">
+        Нет аккаунта? <a href="{{ url_for('register') }}">Зарегистрируйтесь</a>
+    </p>
+</div>
+{% endblock %}

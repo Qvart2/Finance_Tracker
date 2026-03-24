@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Регистрация - Финансовый трекер{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>Регистрация</h1>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+
+        <div class="form-group">
+            {{ form.username.label }}
+            {{ form.username() }}
+            {% if form.username.errors %}
+            {% for error in form.username.errors %}
+            <div class="error">{{ error }}</div>
+            {% endfor %}
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            {{ form.password.label }}
+            {{ form.password() }}
+            {% if form.password.errors %}
+            {% for error in form.password.errors %}
+            <div class="error">{{ error }}</div>
+            {% endfor %}
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            {{ form.confirm_password.label }}
+            {{ form.confirm_password() }}
+            {% if form.confirm_password.errors %}
+            {% for error in form.confirm_password.errors %}
+            <div class="error">{{ error }}</div>
+            {% endfor %}
+            {% endif %}
+        </div>
+
+        {{ form.submit(class="btn btn-block") }}
+    </form>
+
+    <p style="text-align: center; margin-top: 20px;">
+        Уже есть аккаунт? <a href="{{ url_for('login') }}">Войдите</a>
+    </p>
+</div>
+{% endblock %}
