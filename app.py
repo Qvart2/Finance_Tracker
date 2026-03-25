@@ -3,7 +3,7 @@
 Учебный проект, неделя 5-6: Авторизация пользователей
 """
 
-from flask import Flask, render_template, redirect, url_for, flash, request
+from flask import Flask, render_template, redirect, url_for, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager,
@@ -33,6 +33,25 @@ login_manager.login_message = "Пожалуйста, войдите для до�
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+
+# ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+
+
+def json_success(message, redirect_url=None):
+    """Возвращает JSON-ответ об успехе"""
+    response = {"success": True, "message": message}
+    if redirect_url:
+        response["redirect"] = redirect_url
+    return jsonify(response)
+
+
+def json_error(message, errors=None):
+    """Возвращает JSON-ответ об ошибке"""
+    response = {"success": False, "message": message}
+    if errors:
+        response["errors"] = errors
+    return jsonify(response), 400
 
 
 # ==================== МОДЕЛИ ====================
@@ -144,13 +163,32 @@ def register():
         return redirect(url_for("dashboard"))
 
     form = RegistrationForm()
-    if form.validate_on_submit():
-        user = User(username=form.username.data)
-        user.set_password(form.password.data)
-        db.session.add(user)
-        db.session.commit()
-        flash("Регистрация успешна! Теперь вы можете войти.", "success")
-        return redirect(url_for("login"))
+    
+    if request.method == "POST":
+        # Проверяем, AJAX это или обычный запрос
+        if request.is_json:
+            data = request.get_json()
+            # Заполняем форму данными из JSON
+            form.username.data = data.get("username", "")
+            form.password.data = data.get("password", "")
+            form.confirm_password.data = data.get("confirm_password", "")
+            
+            if form.validate():
+                user = User(username=form.username.data)
+                user.set_password(form.password.data)
+                db.session.add(user)
+                db.session.commit()
+                return json_success("Регистрация успешна! Теперь вы можете войти.", url_for("login"))
+            else:
+                errors = {field: list(form[field].errors) for field in form.errors}
+                return json_error("Ошибка валидации", errors)
+        else:
+            if form.validate_on_submit():
+                user = User(username=form.username.data)
+                user.set_password(form.password.data)
+                db.session.add(user)
+                db.session.commit()
+                return redirect(url_for("login"))
 
     return render_template("register.html", form=form)
 
@@ -162,15 +200,34 @@ def login():
         return redirect(url_for("dashboard"))
 
     form = LoginForm()
-    if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
-        if user and user.check_password(form.password.data):
-            login_user(user)
-            flash("Вы успешно вошли!", "success")
-            next_page = request.args.get("next")
-            return redirect(next_page) if next_page else redirect(url_for("dashboard"))
+    
+    if request.method == "POST":
+        if request.is_json:
+            data = request.get_json()
+            form.username.data = data.get("username", "")
+            form.password.data = data.get("password", "")
+            
+            if form.validate():
+                user = User.query.filter_by(username=form.username.data).first()
+                if user and user.check_password(form.password.data):
+                    login_user(user)
+                    next_page = data.get("next") or request.args.get("next")
+                    redirect_url = next_page if next_page else url_for("dashboard")
+                    return json_success("Вы успешно вошли!", redirect_url)
+                else:
+                    return json_error("Неверное имя пользователя или пароль.")
+            else:
+                errors = {field: list(form[field].errors) for field in form.errors}
+                return json_error("Ошибка валидации", errors)
         else:
-            flash("Неверное имя пользователя или пароль.", "danger")
+            if form.validate_on_submit():
+                user = User.query.filter_by(username=form.username.data).first()
+                if user and user.check_password(form.password.data):
+                    login_user(user)
+                    next_page = request.args.get("next")
+                    return redirect(next_page) if next_page else redirect(url_for("dashboard"))
+                else:
+                    form.password.errors.append("Неверное имя пользователя или пароль.")
 
     return render_template("login.html", form=form)
 
@@ -180,7 +237,6 @@ def login():
 def logout():
     """Выход из системы"""
     logout_user()
-    flash("Вы вышли из системы.", "info")
     return redirect(url_for("login"))
 
 
