@@ -1,37 +1,79 @@
 {% extends "base.html" %}
 
-{% block title %}Вход - Финансовый трекер{% endblock %}
+{% block title %}Вход{% endblock %}
 
 {% block content %}
-<div class="card">
-    <h1>Вход</h1>
-    <form id="login-form" data-action="{{ url_for('login') }}">
-        {{ form.hidden_tag() }}
-
-        <div class="form-group">
-            {{ form.username.label }}
-            {{ form.username() }}
+<div style="display: flex; justify-content: center; align-items: center; min-height: 80vh;">
+    <div class="card" style="max-width: 420px; width: 100%;">
+        <div style="text-align: center; margin-bottom: 30px;">
+            <i class="fas fa-wallet" style="font-size: 48px; color: #667eea; margin-bottom: 15px;"></i>
+            <h1 style="margin-bottom: 10px;">С возвращением</h1>
+            <p style="color: #6b7280;">Войдите в свой аккаунт</p>
         </div>
-
-        <div class="form-group">
-            {{ form.password.label }}
-            {{ form.password() }}
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username"><i class="fas fa-user"></i> Имя пользователя</label>
+                <input type="text" id="username" name="username" placeholder="Введите имя пользователя" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password"><i class="fas fa-lock"></i> Пароль</label>
+                <input type="password" id="password" name="password" placeholder="Введите пароль" required>
+            </div>
+            
+            <button type="submit" class="btn btn-block">
+                <i class="fas fa-sign-in-alt"></i> Войти
+            </button>
+        </form>
+        
+        <div style="text-align: center; margin-top: 25px; color: #6b7280;">
+            <p>Нет аккаунта? <a href="{{ url_for('register') }}" style="color: #667eea; font-weight: 600;">Зарегистрироваться</a></p>
         </div>
-
-        {{ form.submit(class="btn btn-block") }}
-    </form>
-
-    <p style="text-align: center; margin-top: 20px;">
-        Нет аккаунта? <a href="{{ url_for('register') }}">Зарегистрируйтесь</a>
-    </p>
+    </div>
 </div>
 
+<style>
+.btn-block {
+    justify-content: center;
+    padding: 14px;
+    font-size: 16px;
+}
+</style>
+
 <script>
-document.getElementById('login-form').addEventListener('submit', function(e) {
+document.getElementById('loginForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    const form = this;
-    const url = form.dataset.action;
-    handleFormSubmit(form, url);
+    
+    const formData = {
+        username: document.getElementById('username').value,
+        password: document.getElementById('password').value
+    };
+    
+    fetch('{{ url_for("login") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showToast(result.message, 'success');
+            if (result.redirect) {
+                setTimeout(() => {
+                    window.location.href = result.redirect;
+                }, 1000);
+            }
+        } else {
+            showToast(result.message, 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Произошла ошибка. Попробуйте ещё раз.', 'error');
+        console.error('Error:', error);
+    });
 });
 </script>
 {% endblock %}

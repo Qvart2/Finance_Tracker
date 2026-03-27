@@ -4,50 +4,192 @@
 
 {% block content %}
 <nav>
-    <span class="nav-brand">💰 Финансовый трекер</span>
+    <span class="nav-brand"><i class="fas fa-wallet"></i> Finance Tracker</span>
     <div>
-        <span style="margin-right: 15px; color: #666;">Привет, {{ current_user.username }}!</span>
-        <a href="{{ url_for('dashboard') }}">Транзакции</a>
-        <a href="{{ url_for('logout') }}">Выйти</a>
+        <span style="margin-right: 20px; color: #6b7280;"><i class="fas fa-user-circle"></i> {{ current_user.username }}</span>
+        <a href="{{ url_for('dashboard') }}" class="active"><i class="fas fa-exchange-alt"></i> Транзакции</a>
+        <a href="{{ url_for('categories') }}"><i class="fas fa-tags"></i> Категории</a>
+        <a href="{{ url_for('budgets') }}"><i class="fas fa-chart-pie"></i> Бюджеты</a>
+        <a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Выйти</a>
     </div>
 </nav>
 
+<!-- Баланс -->
+<div class="stats-row">
+    <div class="stat-card income-card">
+        <div class="stat-icon"><i class="fas fa-arrow-up"></i></div>
+        <div class="stat-label">Доходы</div>
+        <div class="stat-value income">{{ "%.2f ₽"|format(total_income) }}</div>
+    </div>
+    <div class="stat-card expense-card">
+        <div class="stat-icon"><i class="fas fa-arrow-down"></i></div>
+        <div class="stat-label">Расходы</div>
+        <div class="stat-value expense">{{ "%.2f ₽"|format(total_expense) }}</div>
+    </div>
+    <div class="stat-card balance-card">
+        <div class="stat-icon"><i class="fas fa-wallet"></i></div>
+        <div class="stat-label">Баланс</div>
+        <div class="stat-value {% if balance >= 0 %}income{% else %}expense{% endif %}">
+            {{ "%.2f ₽"|format(balance) }}
+        </div>
+    </div>
+</div>
+
 <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h1 style="margin-bottom: 0;">Мои транзакции</h1>
-        <a href="{{ url_for('add_transaction') }}" class="btn">+ Добавить</a>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+        <h1 style="margin-bottom: 0; display: flex; align-items: center; gap: 10px;">
+            <i class="fas fa-list-alt" style="color: #667eea;"></i>
+            Мои транзакции
+        </h1>
+        <a href="{{ url_for('add_transaction') }}" class="btn">
+            <i class="fas fa-plus"></i> Добавить
+        </a>
     </div>
     
     {% if transactions %}
     <table>
         <thead>
             <tr>
-                <th>Дата</th>
-                <th>Описание</th>
-                <th class="text-right">Сумма</th>
-                <th class="text-center">Действия</th>
+                <th><i class="fas fa-calendar-alt"></i> Дата</th>
+                <th><i class="fas fa-align-left"></i> Описание</th>
+                <th><i class="fas fa-tag"></i> Категория</th>
+                <th class="text-right"><i class="fas fa-money-bill-wave"></i> Сумма</th>
+                <th class="text-center"><i class="fas fa-cogs"></i> Действия</th>
             </tr>
         </thead>
         <tbody>
             {% for transaction in transactions %}
             <tr>
-                <td>{{ transaction.date.strftime('%d.%m.%Y') }}</td>
+                <td>
+                    <span style="display: inline-flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-clock" style="color: #9ca3af; font-size: 12px;"></i>
+                        {{ transaction.date.strftime('%d.%m.%Y') }}
+                    </span>
+                </td>
                 <td>{{ transaction.description or 'Без описания' }}</td>
-                <td class="text-right expense">{{ "%.2f ₽"|format(transaction.amount) }}</td>
+                <td>
+                    {% if transaction.category %}
+                    <span class="category-badge" style="background-color: {{ transaction.category.color }}15; color: {{ transaction.category.color }}; border: 1px solid {{ transaction.category.color }}30;">
+                        <i class="fas fa-tag"></i> {{ transaction.category.name }}
+                    </span>
+                    {% else %}
+                    <span style="color: #9ca3af;"><i class="fas fa-minus"></i> —</span>
+                    {% endif %}
+                </td>
+                <td class="text-right {% if transaction.category and transaction.category.type == 'income' %}income{% else %}expense{% endif %}">
+                    <i class="fas {% if transaction.category and transaction.category.type == 'income' %}fa-arrow-up{% else %}fa-arrow-down{% endif %}" style="font-size: 10px; margin-right: 5px;"></i>
+                    {{ "%.2f ₽"|format(transaction.amount) }}
+                </td>
                 <td class="text-center">
-                    <a href="{{ url_for('edit_transaction', transaction_id=transaction.id) }}" class="btn" style="padding: 5px 10px; font-size: 12px;">✏️</a>
-                    <button onclick="deleteTransaction({{ transaction.id }})" class="btn btn-danger" style="padding: 5px 10px; font-size: 12px;">🗑️</button>
+                    <a href="{{ url_for('edit_transaction', transaction_id=transaction.id) }}" class="btn btn-sm btn-secondary" title="Редактировать">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    <button onclick="deleteTransaction({{ transaction.id }})" class="btn btn-sm btn-danger" title="Удалить">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
     {% else %}
-    <p style="text-align: center; color: #888; padding: 40px;">
-        У вас пока нет транзакций. <a href="{{ url_for('add_transaction') }}">Добавьте первую!</a>
-    </p>
+    <div style="text-align: center; padding: 60px 20px;">
+        <i class="fas fa-receipt" style="font-size: 64px; color: #d1d5db; margin-bottom: 20px;"></i>
+        <p style="color: #6b7280; font-size: 16px; margin-bottom: 20px;">У вас пока нет транзакций</p>
+        <a href="{{ url_for('add_transaction') }}" class="btn">
+            <i class="fas fa-plus"></i> Добавить первую транзакцию
+        </a>
+    </div>
     {% endif %}
 </div>
+
+<style>
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 25px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 15px;
+    font-size: 20px;
+}
+
+.income-card .stat-icon {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.expense-card .stat-icon {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+}
+
+.balance-card .stat-icon {
+    background: linear-gradient(135deg, #667eea, #5a6fd6);
+    color: white;
+}
+
+.stat-label {
+    font-size: 13px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+
+.stat-value {
+    font-size: 26px;
+    font-weight: 700;
+}
+
+.category-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+@media (max-width: 768px) {
+    .stats-row {
+        grid-template-columns: 1fr;
+    }
+    
+    nav {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    nav a {
+        margin: 5px 0;
+    }
+}
+</style>
 
 <script>
 async function deleteTransaction(id) {
@@ -66,15 +208,15 @@ async function deleteTransaction(id) {
         const result = await response.json();
         
         if (result.success) {
-            showAlert(result.message, 'success');
+            showToast(result.message, 'success');
             setTimeout(() => {
                 window.location.reload();
             }, 1000);
         } else {
-            showAlert(result.message, 'error');
+            showToast(result.message, 'error');
         }
     } catch (error) {
-        showAlert('Произошла ошибка при удалении.', 'error');
+        showToast('Произошла ошибка при удалении.', 'error');
         console.error('Error:', error);
     }
 }

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ action }} транзакцию - Финансовый трекер{% endblock %}
+{% block title %}{{ action }} транзакцию{% endblock %}
 
 {% block content %}
 <nav>
@@ -8,86 +8,87 @@
     <div>
         <span style="margin-right: 15px; color: #666;">Привет, {{ current_user.username }}!</span>
         <a href="{{ url_for('dashboard') }}">Транзакции</a>
+        <a href="{{ url_for('categories') }}">Категории</a>
+        <a href="{{ url_for('budgets') }}">Бюджеты</a>
         <a href="{{ url_for('logout') }}">Выйти</a>
     </div>
 </nav>
 
 <div class="card">
-    <h1>{{ action }} транзакцию</h1>
-    <form id="transaction-form" data-action="{{ url_for('add_transaction' if action == 'Добавить' else 'edit_transaction', transaction_id=transaction.id if transaction else None) }}">
-        {{ form.hidden_tag() }}
-
+    <h1 style="margin-bottom: 20px;">{{ action }} транзакцию</h1>
+    
+    <form id="transactionForm">
         <div class="form-group">
-            {{ form.amount.label }}
-            {{ form.amount(class="form-control", placeholder="0.00") }}
+            <label for="amount">Сумма (₽)</label>
+            <input type="number" id="amount" name="amount" step="0.01" min="0.01" 
+                   value="{{ transaction.amount if transaction else '' }}" required>
         </div>
-
+        
         <div class="form-group">
-            {{ form.date.label }}
-            {{ form.date(class="form-control", type="date") }}
+            <label for="date">Дата</label>
+            <input type="date" id="date" name="date" 
+                   value="{{ transaction.date.strftime('%Y-%m-%d') if transaction else '' | default('', true) }}" required>
         </div>
-
+        
         <div class="form-group">
-            {{ form.description.label }}
-            {{ form.description(class="form-control", rows="3", placeholder="Описание транзакции...") }}
+            <label for="category_id">Категория</label>
+            <select id="category_id" name="category_id">
+                <option value="">-- Без категории --</option>
+                {% for category in categories %}
+                <option value="{{ category.id }}" {% if transaction and transaction.category_id == category.id %}selected{% endif %}>
+                    {{ category.name }} {% if category.type == 'income' %}(доход){% else %}(расход){% endif %}
+                </option>
+                {% endfor %}
+            </select>
         </div>
-
-        <div style="display: flex; gap: 10px;">
-            {{ form.submit(class="btn") }}
+        
+        <div class="form-group">
+            <label for="description">Описание</label>
+            <textarea id="description" name="description" rows="3" 
+                      placeholder="Описание транзакции...">{{ transaction.description if transaction else '' }}</textarea>
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button type="submit" class="btn">{{ action }}</button>
             <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Отмена</a>
         </div>
     </form>
 </div>
 
 <script>
-document.getElementById('transaction-form').addEventListener('submit', function(e) {
+document.getElementById('transactionForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    const form = this;
-    const url = form.dataset.action;
     
-    const formData = new FormData(form);
-    const data = Object.fromEntries(formData.entries());
+    const formData = {
+        amount: document.getElementById('amount').value,
+        date: document.getElementById('date').value,
+        category_id: document.getElementById('category_id').value || null,
+        description: document.getElementById('description').value
+    };
     
-    // Преобразуем дату в нужный формат
-    if (data.date) {
-        data.date = data.date;
-    }
+    let url;
+    {% if transaction %}
+    url = '{{ url_for("edit_transaction", transaction_id=transaction.id) }}';
+    {% else %}
+    url = '{{ url_for("add_transaction") }}';
+    {% endif %}
     
     fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(formData)
     })
     .then(response => response.json())
     .then(result => {
-        document.querySelectorAll('.error').forEach(el => el.remove());
-        document.querySelectorAll('.field-error').forEach(el => el.classList.remove('field-error'));
-        
         if (result.success) {
             showAlert(result.message, 'success');
-            if (result.redirect) {
-                setTimeout(() => {
-                    window.location.href = result.redirect;
-                }, 1000);
-            }
+            setTimeout(() => {
+                window.location.href = result.redirect || '{{ url_for("dashboard") }}';
+            }, 1000);
         } else {
             showAlert(result.message, 'error');
-            if (result.errors) {
-                for (const [field, errors] of Object.entries(result.errors)) {
-                    const input = form.querySelector(`[name="${field}"]`);
-                    if (input) {
-                        input.classList.add('field-error');
-                        errors.forEach(errorText => {
-                            const errorDiv = document.createElement('div');
-                            errorDiv.className = 'error';
-                            errorDiv.textContent = errorText;
-                            input.parentElement.appendChild(errorDiv);
-                        });
-                    }
-                }
-            }
         }
     })
     .catch(error => {
@@ -95,5 +96,10 @@ document.getElementById('transaction-form').addEventListener('submit', function(
         console.error('Error:', error);
     });
 });
+
+// Устанавливаем сегодняшнюю дату по умолчанию
+if (!document.getElementById('date').value) {
+    document.getElementById('date').valueAsDate = new Date();
+}
 </script>
 {% endblock %}

@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Бюджеты{% endblock %}
+
+{% block content %}
+<nav>
+    <span class="nav-brand"><i class="fas fa-wallet"></i> Finance Tracker</span>
+    <div>
+        <span style="margin-right: 20px; color: #6b7280;"><i class="fas fa-user-circle"></i> {{ current_user.username }}</span>
+        <a href="{{ url_for('dashboard') }}"><i class="fas fa-exchange-alt"></i> Транзакции</a>
+        <a href="{{ url_for('categories') }}"><i class="fas fa-tags"></i> Категории</a>
+        <a href="{{ url_for('budgets') }}" class="active"><i class="fas fa-chart-pie"></i> Бюджеты</a>
+        <a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Выйти</a>
+    </div>
+</nav>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+        <h1 style="margin-bottom: 0; display: flex; align-items: center; gap: 10px;">
+            <i class="fas fa-chart-pie" style="color: #667eea;"></i>
+            Управление бюджетами
+        </h1>
+        <a href="{{ url_for('add_budget') }}" class="btn">
+            <i class="fas fa-plus"></i> Добавить
+        </a>
+    </div>
+    
+    {% if budget_stats %}
+    <div class="budgets-list">
+        {% for item in budget_stats %}
+        <div class="budget-card">
+            <div class="budget-header">
+                <div class="budget-category">
+                    <span class="budget-color" style="background: linear-gradient(135deg, {{ item.budget.category.color if item.budget.category else '#667eea' }}, {{ item.budget.category.color if item.budget.category else '#667eea' }}cc);"></span>
+                    <div>
+                        <h3>{{ item.budget.category.name if item.budget.category else 'Без категории' }}</h3>
+                        <span class="budget-period">
+                            <i class="fas fa-calendar"></i>
+                            {{ ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'][item.budget.month - 1] }} {{ item.budget.year }}
+                        </span>
+                    </div>
+                </div>
+                <div class="budget-actions">
+                    <a href="{{ url_for('edit_budget', budget_id=item.budget.id) }}" class="btn btn-sm btn-secondary" title="Редактировать">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    <button onclick="deleteBudget({{ item.budget.id }})" class="btn btn-sm btn-danger" title="Удалить">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="budget-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill {% if item.percentage > 100 %}over-budget{% elif item.percentage > 80 %}warning{% endif %}" 
+                         style="width: {{ item.percentage }}%; background: linear-gradient(135deg, {{ item.budget.category.color if item.budget.category else '#667eea' }}, {{ item.budget.category.color if item.budget.category else '#667eea' }}cc);"></div>
+                </div>
+                <div class="progress-info">
+                    <span><i class="fas fa-coins"></i> {{ "%.2f ₽"|format(item.spent) }} / {{ "%.2f ₽"|format(item.budget.limit) }}</span>
+                    <span class="{% if item.remaining < 0 %}expense{% else %}income{% endif %}">
+                        {% if item.remaining >= 0 %}
+                            <i class="fas fa-piggy-bank"></i> Осталось: {{ "%.2f ₽"|format(item.remaining) }}
+                        {% else %}
+                            <i class="fas fa-exclamation-triangle"></i> Превышено: {{ "%.2f ₽"|format(-item.remaining) }}
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            
+            <div class="budget-percentage">
+                <span>{{ "%.0f"|format(item.percentage) }}% использовано</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 60px 20px;">
+        <i class="fas fa-chart-pie" style="font-size: 64px; color: #d1d5db; margin-bottom: 20px;"></i>
+        <p style="color: #6b7280; font-size: 16px; margin-bottom: 20px;">У вас пока нет бюджетов</p>
+        <a href="{{ url_for('add_budget') }}" class="btn">
+            <i class="fas fa-plus"></i> Создать первый бюджет
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.budgets-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.budget-card {
+    background: #f9fafb;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #e5e7eb;
+    transition: all 0.3s ease;
+}
+
+.budget-card:hover {
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.budget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+}
+
+.budget-category {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.budget-color {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.budget-category h3 {
+    margin: 0 0 4px 0;
+    font-size: 18px;
+    color: #1f2937;
+}
+
+.budget-period {
+    color: #6b7280;
+    font-size: 13px;
+}
+
+.budget-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.budget-progress {
+    margin-bottom: 10px;
+}
+
+.progress-bar {
+    height: 10px;
+    background: #e5e7eb;
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.5s ease;
+}
+
+.progress-fill.warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+}
+
+.progress-fill.over-budget {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+}
+
+.budget-percentage {
+    text-align: right;
+    font-size: 13px;
+    color: #6b7280;
+}
+</style>
+
+<script>
+async function deleteBudget(id) {
+    if (!confirm('Вы уверены, что хотите удалить этот бюджет?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/budget/delete/${id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast(result.message, 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showToast(result.message, 'error');
+        }
+    } catch (error) {
+        showToast('Произошла ошибка при удалении.', 'error');
+        console.error('Error:', error);
+    }
+}
+</script>
+{% endblock %}

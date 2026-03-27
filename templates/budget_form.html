@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}{{ action }} бюджет{% endblock %}
+
+{% block content %}
+<nav>
+    <span class="nav-brand">💰 Финансовый трекер</span>
+    <div>
+        <span style="margin-right: 15px; color: #666;">Привет, {{ current_user.username }}!</span>
+        <a href="{{ url_for('dashboard') }}">Транзакции</a>
+        <a href="{{ url_for('categories') }}">Категории</a>
+        <a href="{{ url_for('budgets') }}">Бюджеты</a>
+        <a href="{{ url_for('logout') }}">Выйти</a>
+    </div>
+</nav>
+
+<div class="card">
+    <h1 style="margin-bottom: 20px;">{{ action }} бюджет</h1>
+    
+    {% if categories %}
+    <form id="budgetForm">
+        <div class="form-group">
+            <label for="category_id">Категория (только расходы)</label>
+            <select id="category_id" name="category_id" required>
+                <option value="">-- Выберите категорию --</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}" {% if budget and budget.category_id == cat.id %}selected{% endif %}>
+                    {{ cat.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="limit">Лимит бюджета (₽)</label>
+            <input type="number" id="limit" name="limit" step="0.01" min="0.01" 
+                   value="{{ budget.limit if budget else '' }}" required>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div class="form-group">
+                <label for="month">Месяц</label>
+                <select id="month" name="month" required>
+                    <option value="1" {% if budget and budget.month == 1 %}selected{% endif %}>Январь</option>
+                    <option value="2" {% if budget and budget.month == 2 %}selected{% endif %}>Февраль</option>
+                    <option value="3" {% if budget and budget.month == 3 %}selected{% endif %}>Март</option>
+                    <option value="4" {% if budget and budget.month == 4 %}selected{% endif %}>Апрель</option>
+                    <option value="5" {% if budget and budget.month == 5 %}selected{% endif %}>Май</option>
+                    <option value="6" {% if budget and budget.month == 6 %}selected{% endif %}>Июнь</option>
+                    <option value="7" {% if budget and budget.month == 7 %}selected{% endif %}>Июль</option>
+                    <option value="8" {% if budget and budget.month == 8 %}selected{% endif %}>Август</option>
+                    <option value="9" {% if budget and budget.month == 9 %}selected{% endif %}>Сентябрь</option>
+                    <option value="10" {% if budget and budget.month == 10 %}selected{% endif %}>Октябрь</option>
+                    <option value="11" {% if budget and budget.month == 11 %}selected{% endif %}>Ноябрь</option>
+                    <option value="12" {% if budget and budget.month == 12 %}selected{% endif %}>Декабрь</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="year">Год</label>
+                <select id="year" name="year" required>
+                    <option value="{{ current_year }}" {% if not budget or budget.year == current_year %}selected{% endif %}>{{ current_year }}</option>
+                    <option value="{{ current_year + 1 }}" {% if budget and budget.year == current_year + 1 %}selected{% endif %}>{{ current_year + 1 }}</option>
+                </select>
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button type="submit" class="btn">{{ action }}</button>
+            <a href="{{ url_for('budgets') }}" class="btn btn-secondary">Отмена</a>
+        </div>
+    </form>
+    {% else %}
+    <div class="alert info show">
+        У вас нет категорий расходов. <a href="{{ url_for('add_category') }}">Создайте категорию расходов</a> для начала.
+    </div>
+    <a href="{{ url_for('budgets') }}" class="btn btn-secondary">Назад к бюджетам</a>
+    {% endif %}
+</div>
+
+<script>
+document.getElementById('budgetForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = {
+        category_id: document.getElementById('category_id').value,
+        limit: document.getElementById('limit').value,
+        month: document.getElementById('month').value,
+        year: document.getElementById('year').value
+    };
+    
+    const url = '{{ action_url if action_url else url_for("add_budget") }}';
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showAlert(result.message, 'success');
+            setTimeout(() => {
+                window.location.href = result.redirect || '{{ url_for("budgets") }}';
+            }, 1000);
+        } else {
+            showAlert(result.message, 'error');
+        }
+    })
+    .catch(error => {
+        showAlert('Произошла ошибка. Попробуйте ещё раз.', 'error');
+        console.error('Error:', error);
+    });
+});
+</script>
+{% endblock %}
