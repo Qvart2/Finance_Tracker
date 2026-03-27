@@ -4,6 +4,8 @@
 """
 
 from flask import Flask, render_template, redirect, url_for, request, jsonify
+from wtforms import StringField, PasswordField, SubmitField, FloatField, TextAreaField, DateField, SelectField
+from wtforms.validators import DataRequired, Length, EqualTo, ValidationError
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager,
@@ -14,10 +16,8 @@ from flask_login import (
     current_user,
 )
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField
-from wtforms.validators import DataRequired, Length, EqualTo, ValidationError
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, date
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "your-secret-key-change-in-production"
@@ -118,6 +118,22 @@ class LoginForm(FlaskForm):
         "Пароль", validators=[DataRequired(message="Введите пароль")]
     )
     submit = SubmitField("Войти")
+
+
+class TransactionForm(FlaskForm):
+    """Форма транзакции"""
+
+    amount = FloatField(
+        "Сумма",
+        validators=[DataRequired(message="Введите сумму")],
+    )
+    date = DateField(
+        "Дата",
+        format="%Y-%m-%d",
+        validators=[DataRequired(message="Выберите дату")],
+    )
+    description = TextAreaField("Описание")
+    submit = SubmitField("Сохранить")
 
 
 class Category(db.Model):
@@ -253,6 +269,107 @@ def dashboard():
         .all()
     )
     return render_template("dashboard.html", transactions=transactions)
+
+
+@app.route("/transaction/add", methods=["GET", "POST"])
+@login_required
+def add_transaction():
+    """Добавление транзакции"""
+    form = TransactionForm()
+    
+    if request.method == "POST":
+        if request.is_json:
+            data = request.get_json()
+            try:
+                amount = float(data.get("amount", 0))
+                date_str = data.get("date", "")
+                transaction_date = datetime.strptime(date_str, "%Y-%m-%d").date() if date_str else date.today()
+            except (ValueError, TypeError):
+                return json_error("Неверный формат данных")
+            
+            if amount <= 0:
+                return json_error("Сумма должна быть больше 0")
+            
+            transaction = Transaction(
+                user_id=current_user.id,
+                amount=amount,
+                date=transaction_date,
+                description=data.get("description", "")
+            )
+            db.session.add(transaction)
+            db.session.commit()
+            return json_success("Транзакция добавлена!", url_for("dashboard"))
+        else:
+            if form.validate_on_submit():
+                transaction = Transaction(
+                    user_id=current_user.id,
+                    amount=form.amount.data,
+                    date=form.date.data,
+                    description=form.description.data
+                )
+                db.session.add(transaction)
+                db.session.commit()
+                return redirect(url_for("dashboard"))
+    
+    return render_template("transaction_form.html", form=form, action="Добавить")
+
+
+@app.route("/transaction/edit/<int:transaction_id>", methods=["GET", "POST"])
+@login_required
+def edit_transaction(transaction_id):
+    """Редактирование транзакции"""
+    transaction = Transaction.query.filter_by(
+        id=transaction_id, 
+        user_id=current_user.id
+    ).first_or_404()
+    
+    form = TransactionForm(obj=transaction)
+    
+    if request.method == "POST":
+        if request.is_json:
+            data = request.get_json()
+            try:
+                amount = float(data.get("amount", 0))
+                date_str = data.get("date", "")
+                transaction_date = datetime.strptime(date_str, "%Y-%m-%d").date() if date_str else date.today()
+            except (ValueError, TypeError):
+                return json_error("Неверный формат данных")
+            
+            if amount <= 0:
+                return json_error("Сумма должна быть больше 0")
+            
+            transaction.amount = amount
+            transaction.date = transaction_date
+            transaction.description = data.get("description", "")
+            db.session.commit()
+            return json_success("Транзакция обновлена!", url_for("dashboard"))
+        else:
+            if form.validate_on_submit():
+                transaction.amount = form.amount.data
+                transaction.date = form.date.data
+                transaction.description = form.description.data
+                db.session.commit()
+                return redirect(url_for("dashboard"))
+    
+    return render_template("transaction_form.html", form=form, action="Редактировать", transaction=transaction)
+
+
+@app.route("/transaction/delete/<int:transaction_id>", methods=["POST"])
+@login_required
+def delete_transaction(transaction_id):
+    """Удаление транзакции"""
+    transaction = Transaction.query.filter_by(
+        id=transaction_id, 
+        user_id=current_user.id
+    ).first_or_404()
+    
+    db.session.delete(transaction)
+    db.session.commit()
+    
+    if request.is_json:
+        return json_success("Транзакция удалена!")
+    
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/")

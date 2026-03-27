@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}{{ action }} транзакцию - Финансовый трекер{% endblock %}
+
+{% block content %}
+<nav>
+    <span class="nav-brand">💰 Финансовый трекер</span>
+    <div>
+        <span style="margin-right: 15px; color: #666;">Привет, {{ current_user.username }}!</span>
+        <a href="{{ url_for('dashboard') }}">Транзакции</a>
+        <a href="{{ url_for('logout') }}">Выйти</a>
+    </div>
+</nav>
+
+<div class="card">
+    <h1>{{ action }} транзакцию</h1>
+    <form id="transaction-form" data-action="{{ url_for('add_transaction' if action == 'Добавить' else 'edit_transaction', transaction_id=transaction.id if transaction else None) }}">
+        {{ form.hidden_tag() }}
+
+        <div class="form-group">
+            {{ form.amount.label }}
+            {{ form.amount(class="form-control", placeholder="0.00") }}
+        </div>
+
+        <div class="form-group">
+            {{ form.date.label }}
+            {{ form.date(class="form-control", type="date") }}
+        </div>
+
+        <div class="form-group">
+            {{ form.description.label }}
+            {{ form.description(class="form-control", rows="3", placeholder="Описание транзакции...") }}
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            {{ form.submit(class="btn") }}
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Отмена</a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.getElementById('transaction-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = this;
+    const url = form.dataset.action;
+    
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+    
+    // Преобразуем дату в нужный формат
+    if (data.date) {
+        data.date = data.date;
+    }
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        document.querySelectorAll('.error').forEach(el => el.remove());
+        document.querySelectorAll('.field-error').forEach(el => el.classList.remove('field-error'));
+        
+        if (result.success) {
+            showAlert(result.message, 'success');
+            if (result.redirect) {
+                setTimeout(() => {
+                    window.location.href = result.redirect;
+                }, 1000);
+            }
+        } else {
+            showAlert(result.message, 'error');
+            if (result.errors) {
+                for (const [field, errors] of Object.entries(result.errors)) {
+                    const input = form.querySelector(`[name="${field}"]`);
+                    if (input) {
+                        input.classList.add('field-error');
+                        errors.forEach(errorText => {
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className = 'error';
+                            errorDiv.textContent = errorText;
+                            input.parentElement.appendChild(errorDiv);
+                        });
+                    }
+                }
+            }
+        }
+    })
+    .catch(error => {
+        showAlert('Произошла ошибка. Попробуйте ещё раз.', 'error');
+        console.error('Error:', error);
+    });
+});
+</script>
+{% endblock %}

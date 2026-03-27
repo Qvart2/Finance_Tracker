@@ -13,7 +13,11 @@
 </nav>
 
 <div class="card">
-    <h1>Мои транзакции</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1 style="margin-bottom: 0;">Мои транзакции</h1>
+        <a href="{{ url_for('add_transaction') }}" class="btn">+ Добавить</a>
+    </div>
+    
     {% if transactions %}
     <table>
         <thead>
@@ -21,6 +25,7 @@
                 <th>Дата</th>
                 <th>Описание</th>
                 <th class="text-right">Сумма</th>
+                <th class="text-center">Действия</th>
             </tr>
         </thead>
         <tbody>
@@ -29,14 +34,49 @@
                 <td>{{ transaction.date.strftime('%d.%m.%Y') }}</td>
                 <td>{{ transaction.description or 'Без описания' }}</td>
                 <td class="text-right expense">{{ "%.2f ₽"|format(transaction.amount) }}</td>
+                <td class="text-center">
+                    <a href="{{ url_for('edit_transaction', transaction_id=transaction.id) }}" class="btn" style="padding: 5px 10px; font-size: 12px;">✏️</a>
+                    <button onclick="deleteTransaction({{ transaction.id }})" class="btn btn-danger" style="padding: 5px 10px; font-size: 12px;">🗑️</button>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
     {% else %}
     <p style="text-align: center; color: #888; padding: 40px;">
-        У вас пока нет транзакций.
+        У вас пока нет транзакций. <a href="{{ url_for('add_transaction') }}">Добавьте первую!</a>
     </p>
     {% endif %}
 </div>
+
+<script>
+async function deleteTransaction(id) {
+    if (!confirm('Вы уверены, что хотите удалить эту транзакцию?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/transaction/delete/${id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert(result.message, 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showAlert(result.message, 'error');
+        }
+    } catch (error) {
+        showAlert('Произошла ошибка при удалении.', 'error');
+        console.error('Error:', error);
+    }
+}
+</script>
 {% endblock %}
