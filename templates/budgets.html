@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Бюджеты{% endblock %}
+
+{% block content %}
+<nav>
+    <span class="nav-brand">Finance Tracker</span>
+    <div>
+        <a href="{{ url_for('dashboard') }}">Транзакции</a>
+        <a href="{{ url_for('categories') }}">Категории</a>
+        <a href="{{ url_for('budgets') }}" class="active">Бюджеты</a>
+        <a href="{{ url_for('logout') }}">Выйти</a>
+    </div>
+</nav>
+
+<div class="card">
+    <div class="card-header">
+        <h1>Бюджеты</h1>
+        <a href="{{ url_for('add_budget') }}" class="btn">+ Добавить</a>
+    </div>
+    
+    {% if budgets %}
+    <table>
+        <thead>
+            <tr>
+                <th>Категория</th>
+                <th>Месяц</th>
+                <th>Год</th>
+                <th class="text-right">Лимит</th>
+                <th class="text-right">Потрачено</th>
+                <th class="text-right">Остаток</th>
+                <th class="text-center">Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for budget in budgets %}
+            {% set spent = namespace(value=0) %}
+            {% for t in current_user.transactions if t.type == 'expense' and t.category_id == budget.category_id and t.date.month == budget.month and t.date.year == budget.year %}
+                {% set spent.value = spent.value + t.amount %}
+            {% endfor %}
+            {% set remaining = budget.limit - spent.value %}
+            <tr>
+                <td>
+                    {% if budget.category %}
+                    <span class="category-badge" style="border-left: 3px solid {{ budget.category.color }};">
+                        {{ budget.category.name }}
+                    </span>
+                    {% else %}
+                    <span class="category-badge">—</span>
+                    {% endif %}
+                </td>
+                <td>{{ ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'][budget.month - 1] }}</td>
+                <td>{{ budget.year }}</td>
+                <td class="text-right">{{ "%.2f ₽"|format(budget.limit) }}</td>
+                <td class="text-right expense">{{ "%.2f ₽"|format(spent.value) }}</td>
+                <td class="text-right {% if remaining >= 0 %}income{% else %}expense{% endif %}">
+                    {{ "%.2f ₽"|format(remaining) }}
+                </td>
+                <td class="text-center">
+                    <div class="actions">
+                        <button onclick="deleteBudget({{ budget.id }})" class="btn-icon btn-icon-danger" title="Удалить">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="text-align: center; color: var(--text-light); padding: 40px;">
+        Нет бюджетов<br>
+        <a href="{{ url_for('add_budget') }}" style="color: var(--accent);">Добавить первый бюджет</a>
+    </p>
+    {% endif %}
+</div>
+
+<div id="deleteModal" class="modal">
+    <div class="modal-content">
+        <h3>Удаление бюджета</h3>
+        <p>Вы уверены, что хотите удалить этот бюджет?</p>
+        <div class="modal-actions">
+            <button onclick="closeModal()" class="btn btn-secondary">Отмена</button>
+            <button id="confirmDeleteBtn" class="btn btn-danger">Удалить</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    let deleteBudgetId = null;
+    
+    function deleteBudget(id) {
+        deleteBudgetId = id;
+        document.getElementById('deleteModal').style.display = 'flex';
+    }
+    
+    function closeModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+        deleteBudgetId = null;
+    }
+    
+    document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+        if (!deleteBudgetId) return;
+        
+        try {
+            const response = await fetch(`/budget/delete/${deleteBudgetId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showAlert(result.message, 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showAlert(result.message, 'error');
+            }
+        } catch (error) {
+            showAlert('Произошла ошибка.', 'error');
+        }
+        
+        closeModal();
+    });
+    
+    window.onclick = function(event) {
+        const modal = document.getElementById('deleteModal');
+        if (event.target === modal) closeModal();
+    }
+</script>
+{% endblock %}

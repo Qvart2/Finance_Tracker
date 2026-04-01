@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}{{ action }} категорию{% endblock %}
+
+{% block content %}
+<nav>
+    <span class="nav-brand">Finance Tracker</span>
+    <div>
+        <a href="{{ url_for('dashboard') }}">Транзакции</a>
+        <a href="{{ url_for('categories') }}">Категории</a>
+        <a href="{{ url_for('budgets') }}">Бюджеты</a>
+        <a href="{{ url_for('logout') }}">Выйти</a>
+    </div>
+</nav>
+
+<div class="card">
+    <h1>{{ action }} категорию</h1>
+    
+    <form id="categoryForm">
+        <div class="form-group">
+            <label for="name">Название</label>
+            <input type="text" id="name" name="name" 
+                   value="{{ form.name.data or '' }}" required
+                   maxlength="100">
+        </div>
+        
+        <div class="form-group">
+            <label for="type">Тип</label>
+            <select id="type" name="type">
+                <option value="expense" {% if form.type.data == 'expense' %}selected{% endif %}>Расход</option>
+                <option value="income" {% if form.type.data == 'income' %}selected{% endif %}>Доход</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="color">Цвет</label>
+            <div class="color-input-wrapper">
+                <input type="color" id="color" name="color" value="{{ form.color.data or '#3498db' }}">
+                <span class="color-value">{{ form.color.data or '#3498db' }}</span>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <a href="{{ url_for('categories') }}" class="btn btn-secondary">Отмена</a>
+            <button type="submit" class="btn">{{ action }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    const colorInput = document.getElementById('color');
+    const colorValue = document.querySelector('.color-value');
+    
+    colorInput.addEventListener('input', function() {
+        colorValue.textContent = this.value;
+    });
+    
+    document.getElementById('categoryForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            name: document.getElementById('name').value,
+            type: document.getElementById('type').value,
+            color: document.getElementById('color').value
+        };
+        
+        const url = '{{ url_for("add_category") if action == "Добавить" else url_for("edit_category", category_id=category.id) }}';
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            
+            document.querySelectorAll('.error').forEach(el => el.remove());
+            document.querySelectorAll('.field-error').forEach(el => el.classList.remove('field-error'));
+            
+            if (result.success) {
+                showAlert(result.message, 'success');
+                if (result.redirect) {
+                    setTimeout(() => window.location.href = result.redirect, 1000);
+                }
+            } else {
+                showAlert(result.message, 'error');
+                
+                if (result.errors) {
+                    for (const [field, errors] of Object.entries(result.errors)) {
+                        const input = document.querySelector(`[name="${field}"]`);
+                        if (input) {
+                            input.classList.add('field-error');
+                            errors.forEach(errorText => {
+                                const errorDiv = document.createElement('div');
+                                errorDiv.className = 'error';
+                                errorDiv.textContent = errorText;
+                                input.parentElement.appendChild(errorDiv);
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            showAlert('Произошла ошибка.', 'error');
+        }
+        
+        return false;
+    });
+</script>
+{% endblock %}

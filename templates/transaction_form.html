@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}{{ action }} транзакцию{% endblock %}
+
+{% block content %}
+<nav>
+    <span class="nav-brand">Finance Tracker</span>
+    <div>
+        <a href="{{ url_for('dashboard') }}">Транзакции</a>
+        <a href="{{ url_for('categories') }}">Категории</a>
+        <a href="{{ url_for('budgets') }}">Бюджеты</a>
+        <a href="{{ url_for('logout') }}">Выйти</a>
+    </div>
+</nav>
+
+<div class="card">
+    <h1>{{ action }} транзакцию</h1>
+    
+    <form id="transactionForm">
+        <div class="form-group">
+            <label for="type">Тип</label>
+            <select id="type" name="type">
+                <option value="expense" {% if form.type.data == 'expense' %}selected{% endif %}>Расход</option>
+                <option value="income" {% if form.type.data == 'income' %}selected{% endif %}>Доход</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="amount">Сумма</label>
+            <input type="number" id="amount" name="amount" step="0.01" min="0.01" 
+                   value="{{ form.amount.data or '' }}" required
+                   placeholder="0.00">
+        </div>
+        
+        <div class="form-group">
+            <label for="date">Дата</label>
+            <input type="date" id="date" name="date" 
+                   value="{{ form.date.data.strftime('%Y-%m-%d') if form.date.data else '' }}" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="category_id">Категория</label>
+            <select id="category_id" name="category_id">
+                <option value="0">— Без категории —</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Описание</label>
+            <textarea id="description" name="description" rows="3" 
+                      placeholder="Описание транзакции">{{ form.description.data or '' }}</textarea>
+        </div>
+        
+        <div class="form-actions">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Отмена</a>
+            <button type="submit" class="btn">{{ action }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    // Загрузка категорий при изменении типа
+    async function loadCategories(type, selectedCategoryId = null) {
+        const categorySelect = document.getElementById('category_id');
+        
+        try {
+            const response = await fetch(`/categories/by-type/${type}`);
+            const categories = await response.json();
+            
+            categorySelect.innerHTML = '<option value="0">— Без категории —</option>';
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = cat.name;
+                categorySelect.appendChild(option);
+            });
+            
+            // Установить выбранную категорию (для редактирования)
+            if (selectedCategoryId) {
+                categorySelect.value = selectedCategoryId;
+            }
+        } catch (error) {
+            console.error('Error loading categories:', error);
+        }
+    }
+    
+    // При загрузке страницы загружаем категории для текущего типа
+    document.addEventListener('DOMContentLoaded', function() {
+        const typeSelect = document.getElementById('type');
+        const categoryId = {{ transaction.category_id if transaction else 'null' }};
+        loadCategories(typeSelect.value, categoryId);
+    });
+    
+    // При изменении типа загружаем новые категории
+    document.getElementById('type').addEventListener('change', function() {
+        loadCategories(this.value);
+    });
+    
+    document.getElementById('transactionForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            type: document.getElementById('type').value,
+            amount: document.getElementById('amount').value,
+            date: document.getElementById('date').value,
+            category_id: document.getElementById('category_id').value,
+            description: document.getElementById('description').value
+        };
+        
+        const url = '{{ url_for("add_transaction") if action == "Добавить" else url_for("edit_transaction", transaction_id=transaction.id) }}';
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            
+            document.querySelectorAll('.error').forEach(el => el.remove());
+            document.querySelectorAll('.field-error').forEach(el => el.classList.remove('field-error'));
+            
+            if (result.success) {
+                showAlert(result.message, 'success');
+                if (result.redirect) {
+                    setTimeout(() => window.location.href = result.redirect, 1000);
+                }
+            } else {
+                showAlert(result.message, 'error');
+                
+                if (result.errors) {
+                    for (const [field, errors] of Object.entries(result.errors)) {
+                        const input = document.querySelector(`[name="${field}"]`);
+                        if (input) {
+                            input.classList.add('field-error');
+                            errors.forEach(errorText => {
+                                const errorDiv = document.createElement('div');
+                                errorDiv.className = 'error';
+                                errorDiv.textContent = errorText;
+                                input.parentElement.appendChild(errorDiv);
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            showAlert('Произошла ошибка.', 'error');
+        }
+        
+        return false;
+    });
+</script>
+{% endblock %}

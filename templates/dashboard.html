@@ -4,39 +4,175 @@
 
 {% block content %}
 <nav>
-    <span class="nav-brand">💰 Финансовый трекер</span>
+    <span class="nav-brand">Finance Tracker</span>
     <div>
-        <span style="margin-right: 15px; color: #666;">Привет, {{ current_user.username }}!</span>
-        <a href="{{ url_for('dashboard') }}">Транзакции</a>
+        <span style="margin-right: 16px; color: var(--text-light); font-size: 14px;">{{ current_user.username }}</span>
+        <a href="{{ url_for('dashboard') }}" class="active">Транзакции</a>
+        <a href="{{ url_for('categories') }}">Категории</a>
+        <a href="{{ url_for('budgets') }}">Бюджеты</a>
         <a href="{{ url_for('logout') }}">Выйти</a>
     </div>
 </nav>
 
+<!-- Stats -->
+<div class="stats-container">
+    <div class="stat-card stat-income">
+        <div class="stat-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                <polyline points="17 6 23 6 23 12"></polyline>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <div class="stat-label">Доходы</div>
+            <div class="stat-value">{{ "%.2f ₽"|format(total_income) }}</div>
+        </div>
+    </div>
+    <div class="stat-card stat-expense">
+        <div class="stat-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+                <polyline points="17 18 23 18 23 12"></polyline>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <div class="stat-label">Расходы</div>
+            <div class="stat-value">{{ "%.2f ₽"|format(total_expense) }}</div>
+        </div>
+    </div>
+    <div class="stat-card stat-balance {% if balance >= 0 %}positive{% else %}negative{% endif %}">
+        <div class="stat-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                <line x1="12" y1="10" x2="12" y2="14"></line>
+                <line x1="8" y1="12" x2="16" y2="12"></line>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <div class="stat-label">Баланс</div>
+            <div class="stat-value">{{ "%.2f ₽"|format(balance) }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Transactions -->
 <div class="card">
-    <h1>Мои транзакции</h1>
+    <div class="card-header">
+        <h1>Транзакции</h1>
+        <a href="{{ url_for('add_transaction') }}" class="btn">+ Добавить</a>
+    </div>
+    
     {% if transactions %}
     <table>
         <thead>
             <tr>
                 <th>Дата</th>
                 <th>Описание</th>
+                <th>Категория</th>
                 <th class="text-right">Сумма</th>
+                <th class="text-center">Действия</th>
             </tr>
         </thead>
         <tbody>
             {% for transaction in transactions %}
             <tr>
                 <td>{{ transaction.date.strftime('%d.%m.%Y') }}</td>
-                <td>{{ transaction.description or 'Без описания' }}</td>
-                <td class="text-right expense">{{ "%.2f ₽"|format(transaction.amount) }}</td>
+                <td>{{ transaction.description or '—' }}</td>
+                <td>
+                    {% if transaction.category %}
+                    <span class="category-badge" style="border-left: 3px solid {{ transaction.category.color }};">
+                        {{ transaction.category.name }}
+                    </span>
+                    {% else %}
+                    <span class="category-badge">—</span>
+                    {% endif %}
+                </td>
+                <td class="text-right {{ transaction.type }}">
+                    {% if transaction.type == 'income' %}+{% else %}-{% endif %}{{ "%.2f ₽"|format(transaction.amount) }}
+                </td>
+                <td class="text-center">
+                    <div class="actions">
+                        <a href="{{ url_for('edit_transaction', transaction_id=transaction.id) }}" class="btn-icon" title="Редактировать">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </a>
+                        <button onclick="deleteTransaction({{ transaction.id }})" class="btn-icon btn-icon-danger" title="Удалить">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
     {% else %}
-    <p style="text-align: center; color: #888; padding: 40px;">
-        У вас пока нет транзакций.
+    <p style="text-align: center; color: var(--text-light); padding: 40px;">
+        Нет транзакций<br>
+        <a href="{{ url_for('add_transaction') }}" style="color: var(--accent);">Добавить первую транзакцию</a>
     </p>
     {% endif %}
 </div>
+
+<!-- Modal -->
+<div id="deleteModal" class="modal">
+    <div class="modal-content">
+        <h3>Удаление транзакции</h3>
+        <p>Вы уверены, что хотите удалить эту транзакцию?</p>
+        <div class="modal-actions">
+            <button onclick="closeModal()" class="btn btn-secondary">Отмена</button>
+            <button id="confirmDeleteBtn" class="btn btn-danger">Удалить</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    let deleteTransactionId = null;
+    
+    function deleteTransaction(id) {
+        deleteTransactionId = id;
+        document.getElementById('deleteModal').style.display = 'flex';
+    }
+    
+    function closeModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+        deleteTransactionId = null;
+    }
+    
+    document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+        if (!deleteTransactionId) return;
+        
+        try {
+            const response = await fetch(`/transaction/delete/${deleteTransactionId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showAlert(result.message, 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showAlert(result.message, 'error');
+            }
+        } catch (error) {
+            showAlert('Произошла ошибка.', 'error');
+        }
+        
+        closeModal();
+    });
+    
+    window.onclick = function(event) {
+        const modal = document.getElementById('deleteModal');
+        if (event.target === modal) closeModal();
+    }
+</script>
 {% endblock %}
