@@ -5,9 +5,13 @@
 
 import os
 
+from dotenv import load_dotenv
 from flask import Flask, render_template, redirect, url_for, request, jsonify, flash
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func
+
+load_dotenv()
 from flask_login import (
     LoginManager,
     UserMixin,
@@ -358,23 +362,33 @@ def logout():
 @login_required
 def dashboard():
     """Главная страница с транзакциями"""
-    transactions = (
+    page = request.args.get("page", 1, type=int)
+    per_page = 10
+
+    # Статистика по всем транзакциям через агрегатные запросы
+    total_income = db.session.query(func.sum(Transaction.amount)).filter_by(
+        user_id=current_user.id, type="income"
+    ).scalar() or 0.0
+
+    total_expense = db.session.query(func.sum(Transaction.amount)).filter_by(
+        user_id=current_user.id, type="expense"
+    ).scalar() or 0.0
+
+    balance = total_income - total_expense
+
+    pagination = (
         Transaction.query.filter_by(user_id=current_user.id)
         .order_by(Transaction.date.desc())
-        .all()
+        .paginate(page=page, per_page=per_page, error_out=False)
     )
-    
-    # Подсчет статистики
-    total_income = sum(t.amount for t in transactions if t.type == "income")
-    total_expense = sum(t.amount for t in transactions if t.type == "expense")
-    balance = total_income - total_expense
-    
+
     return render_template(
-        "dashboard.html", 
-        transactions=transactions,
+        "dashboard.html",
+        transactions=pagination.items,
+        pagination=pagination,
         total_income=total_income,
         total_expense=total_expense,
-        balance=balance
+        balance=balance,
     )
 
 
@@ -390,7 +404,10 @@ def add_transaction():
     # Заполняем choices для категорий
     categories = Category.query.filter_by(user_id=current_user.id).all()
     form.category_id.choices = [(0, "Без категории")] + [(c.id, c.name) for c in categories]
-    
+
+    if request.method == "GET":
+        form.date.data = datetime.today().date()
+
     if request.method == "POST":
         if request.is_json:
             data = request.get_json()
@@ -722,6 +739,16 @@ def home():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
+
+
+@app.errorhandler(404)
+def not_found(_):
+    return render_template("404.html"), 404
+
+
+@app.errorhandler(500)
+def server_error(_):
+    return render_template("500.html"), 500
 
 
 if __name__ == "__main__":
