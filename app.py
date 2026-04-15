@@ -3,6 +3,8 @@
 Учебный проект, неделя 5-6: Авторизация пользователей
 """
 
+import os
+
 from flask import Flask, render_template, redirect, url_for, request, jsonify, flash
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from flask_sqlalchemy import SQLAlchemy
@@ -21,7 +23,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "your-secret-key-change-in-production"
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-key-change-in-production")
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///finance.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -392,12 +394,7 @@ def add_transaction():
     if request.method == "POST":
         if request.is_json:
             data = request.get_json()
-            print("Received data:", data)  # Отладка
-            
-            # CSRF токен из JSON
-            if data.get("csrf_token"):
-                form.csrf_token.data = data.get("csrf_token")
-            
+
             # Преобразуем данные в правильные типы для валидации
             amount_val = data.get("amount")
             form.amount.data = float(amount_val) if amount_val else None
@@ -405,14 +402,10 @@ def add_transaction():
             form.date.data = datetime.strptime(date_val, "%Y-%m-%d").date() if date_val else None
             form.description.data = data.get("description", "") or ""
             cat_id_val = data.get("category_id")
-            print("category_id raw:", cat_id_val, type(cat_id_val))
             form.category_id.data = int(cat_id_val) if cat_id_val and str(cat_id_val) != "0" else 0
             form.type.data = data.get("type", "expense")
-            
-            print("Form data after parsing - amount:", form.amount.data, "date:", form.date.data, "category_id:", form.category_id.data, "type:", form.type.data)
-            
+
             if form.validate():
-                print("Form validation passed!")
                 transaction = Transaction(
                     user_id=current_user.id,
                     amount=float(form.amount.data),
@@ -425,7 +418,6 @@ def add_transaction():
                 db.session.commit()
                 return json_success("Транзакция добавлена!", url_for("dashboard"))
             else:
-                print("Form validation errors:", form.errors)
                 errors = {field.name: list(field.errors) for field in form if field.errors}
                 return json_error("Ошибка валидации", errors)
         else:
@@ -441,7 +433,7 @@ def add_transaction():
                 db.session.add(transaction)
                 db.session.commit()
                 return redirect(url_for("dashboard"))
-    
+
     return render_template("transaction_form.html", form=form, action="Добавить")
 
 
@@ -467,7 +459,8 @@ def edit_transaction(transaction_id):
     if request.method == "POST":
         if request.is_json:
             data = request.get_json()
-            form.amount.data = data.get("amount")
+            amount_val = data.get("amount")
+            form.amount.data = float(amount_val) if amount_val else None
             form.date.data = datetime.strptime(data.get("date"), "%Y-%m-%d").date() if data.get("date") else None
             form.description.data = data.get("description", "")
             form.category_id.data = int(data.get("category_id", 0)) if data.get("category_id") else 0

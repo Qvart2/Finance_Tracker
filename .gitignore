@@ -20,7 +20,13 @@ wheels/
 .installed.cfg
 *.egg
 venv/
+env/
 ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Flask
 *.log
@@ -30,6 +36,9 @@ db.sqlite3
 # Environment
 .env
 .env.local
+
+# Project-specific
+CLAUDE.md
 
 # IDE
 .idea/
