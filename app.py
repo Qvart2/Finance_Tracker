@@ -4,14 +4,14 @@
 """
 
 import os
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
-from flask import Flask, render_template, redirect, url_for, request, jsonify
-from flask_wtf.csrf import CSRFProtect, generate_csrf
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func
 
 load_dotenv()
+
+from flask import Flask, render_template, redirect, url_for, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager,
     UserMixin,
@@ -21,6 +21,7 @@ from flask_login import (
     current_user,
 )
 from flask_wtf import FlaskForm
+from sqlalchemy import func
 from wtforms import (
     StringField,
     PasswordField,
@@ -38,7 +39,6 @@ from wtforms.validators import (
     NumberRange,
 )
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY")
@@ -84,7 +84,7 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -145,7 +145,7 @@ class TransactionForm(FlaskForm):
     """Форма добавления/редактирования транзакции"""
 
     class Meta:
-        csrf = False  # Отключаем CSRF для AJAX
+        csrf = False
 
     amount = FloatField(
         "Сумма",
@@ -257,7 +257,7 @@ class Transaction(db.Model):
     description = db.Column(db.Text, nullable=True)
     category_id = db.Column(db.Integer, db.ForeignKey("category.id"), nullable=True)
     type = db.Column(db.String(10), nullable=False, default="expense")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     user = db.relationship("User", backref=db.backref("transactions", lazy=True))
 
 
@@ -365,6 +365,8 @@ def login():
                 if user and user.check_password(form.password.data):
                     login_user(user)
                     next_page = data.get("next") or request.args.get("next")
+                    if next_page and not next_page.startswith("/"):
+                        next_page = None
                     redirect_url = next_page if next_page else url_for("dashboard")
                     return json_success("Вы успешно вошли!", redirect_url)
                 else:
@@ -378,6 +380,8 @@ def login():
                 if user and user.check_password(form.password.data):
                     login_user(user)
                     next_page = request.args.get("next")
+                    if next_page and not next_page.startswith("/"):
+                        next_page = None
                     return (
                         redirect(next_page)
                         if next_page
@@ -831,11 +835,11 @@ def delete_budget(budget_id):
     return redirect(url_for("budgets"))
 
 
-@app.route("/categories/by-type/<type>")
+@app.route("/categories/by-type/<category_type>")
 @login_required
-def get_categories_by_type(type):
+def get_categories_by_type(category_type):
     """Получение категорий по типу (для AJAX)"""
-    categories = Category.query.filter_by(user_id=current_user.id, type=type).all()
+    categories = Category.query.filter_by(user_id=current_user.id, type=category_type).all()
     return jsonify([{"id": c.id, "name": c.name} for c in categories])
 
 

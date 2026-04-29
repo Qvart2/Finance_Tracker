@@ -247,13 +247,15 @@
             gap: 8px;
         }
 
-        .nav-brand::before {
-            content: "";
-            display: inline-block;
-            width: 24px;
-            height: 24px;
+        .nav-brand-icon {
+            width: 28px;
+            height: 28px;
             background: var(--accent);
-            border-radius: 4px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
         }
 
         table {
@@ -373,6 +375,7 @@
         .actions {
             display: flex;
             gap: 8px;
+            justify-content: center;
         }
 
         .btn-icon {
