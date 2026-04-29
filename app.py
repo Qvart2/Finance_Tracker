@@ -1,8 +1,3 @@
-"""
-Финансовый трекер на Flask
-Учебный проект, неделя 5-6: Авторизация пользователей
-"""
-
 import os
 from datetime import datetime, timezone
 
