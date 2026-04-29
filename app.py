@@ -172,6 +172,9 @@ class TransactionForm(FlaskForm):
 class CategoryForm(FlaskForm):
     """Форма добавления/редактирования категории"""
 
+    class Meta:
+        csrf = False
+
     name = StringField(
         "Название",
         validators=[
